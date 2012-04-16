@@ -22,7 +22,7 @@ int win;
 typedef unsigned long long int ullong;
 #define FPS
 #define RIC   0
-#define ff    32 
+#define ff    8 
 
 #define N        (int)(512*ff*ff)
 #define L        20.0
@@ -368,7 +368,7 @@ void simulate(float alpha, float eta, int seed){
     struct timespec startt;
     clock_gettime(CLOCK_REALTIME, &startt);
 
-    int blocks = 512;
+    int blocks = 256;
     printf("Simulating %ix%i = %i...\n", blocks, N/blocks);
     for (t=0.0; t<time_end; t+=dt){
  
@@ -376,6 +376,7 @@ void simulate(float alpha, float eta, int seed){
         step<<<blocks,N/blocks>>>(cu_x, cu_v, cu_type, cu_cells, cu_count, cu_col, cu_size, size_total);
         cudaThreadSynchronize();
 
+        frames++;
         if (frames % 100 == 0){
             struct timespec end;
             clock_gettime(CLOCK_REALTIME, &end);
@@ -383,7 +384,6 @@ void simulate(float alpha, float eta, int seed){
             ERROR_CHECK
             clock_gettime(CLOCK_REALTIME, &startt);
         }
-        frames++;
 
         #ifdef PLOT
         plot_clear_screen();
