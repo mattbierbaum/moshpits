@@ -9,17 +9,17 @@ int plot_sizex;
 int plot_sizey;
 int win;
 
-void key_up(unsigned char key, int x, int y){
-    keys[key] = 0;
+void key_down(unsigned char key, int x, int y){
+  keys[key] = 1;
 }
 
-void key_down(unsigned char key, int x, int y){
-    keys[key] = 1;
+void key_up(unsigned char key, int x, int y){
+  keys[key] = 0;
 }
 
 void plot_init(){
-  plot_sizex = 640;
-  plot_sizey = 640;
+  plot_sizex = 680;
+  plot_sizey = 680;
   win = 0;
   plot_init_opengl();
   int i;
@@ -83,7 +83,7 @@ int *plot_render_particles(double *x, double *rad, int *type, long N, double L, 
     glEnd();
     
     glDisable(GL_POINT_SMOOTH);
-    glPointSize(3);
+    glPointSize(1);
 
     #ifdef POINTS 
     glBegin(GL_POINTS);
@@ -91,19 +91,26 @@ int *plot_render_particles(double *x, double *rad, int *type, long N, double L, 
     double t=0;
     #endif
 
-    int i; 
-    for (i=0; i<N; i++){
-        float tx = (float)x[2*i+0];
-        float ty = (float)x[2*i+1];
+    int i;
+    float tx, ty, cr, cg, cb, ca;
+    double c, rx;
+    uint secs;
 
-        double c = fabs(shade[i]);
+    #ifdef OPENMP
+    //#pragma omp parallel for private(tx,ty, c, cr, cg, cb, ca, rx, t, secs)
+    #endif
+    for (i=0; i<N; i++){
+        tx = (float)x[2*i+0];
+        ty = (float)x[2*i+1];
+
+        c = fabs(shade[i]);
         if (c < 0) c = 0.0;
         if (c > 1.0) c = 1.0;
 
-        float cr = c;
-        float cg = c;
-        float cb = c;
-        float ca = 1.0;
+        cr = c;
+        cg = c;
+        cb = c;
+        ca = 1.0;
 
         if (type[i] == 1) {
             cr = 0.9;//if (cr < 0.2) cr = 0.2;
@@ -115,8 +122,8 @@ int *plot_render_particles(double *x, double *rad, int *type, long N, double L, 
         plot_set_draw_color(cr,cg,cb,ca);
         glVertex2f(tx, ty);
         #else
-        double rx = rad[i];
-        int secs = 15;
+        rx = rad[i];
+        secs = 15;
         plot_set_draw_color(cr,cg,cb,ca);
         glBegin(GL_POLYGON);
         for (t=0; t<2*pi; t+=2*pi/secs)
@@ -129,6 +136,10 @@ int *plot_render_particles(double *x, double *rad, int *type, long N, double L, 
         glEnd();
         #endif
     }
+    #ifdef OPENMP 
+    //#pragma omp barrier
+    #endif
+
     #ifdef POINTS
     glEnd();
     #endif
