@@ -448,9 +448,11 @@ void simulate(double alpha, double eta, int seed){
     free(v);
     free(f);
     free(w);
+    free(o);
     free(neigh);
     free(rad);
     free(type);
+    free(col);
 
     #ifdef PLOT
     plot_clean(); 
