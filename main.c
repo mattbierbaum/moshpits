@@ -140,7 +140,7 @@ void simulate(double alpha, double eta, int seed){
     double FR2= FR*FR;
 
     int i, j, k;
-    int exit = 0;
+    int *keys;
 
     int *type   = (int*)malloc(sizeof(int)*N);
     int *neigh  = (int*)malloc(sizeof(int)*N);
@@ -355,14 +355,14 @@ void simulate(double alpha, double eta, int seed){
 
         #ifdef PLOT 
             plot_clear_screen();
-            exit = plot_render_particles(x, rad, type, N, L,col);
+            keys = plot_render_particles(x, rad, type, N, L,col);
         #endif
         frames++;
 
         vorticity_avg += vorticity(x,v,type,N);
         vorticity_count++;
 
-        if (exit)
+        if (keys['q'] == 1)
             break;
     }
     // end of the magic, cleanup

@@ -9,17 +9,22 @@ int plot_sizex;
 int plot_sizey;
 int win;
 
-void exit_key(unsigned char key, int x, int y){
-  if (key == 'q')
-    commence_exit = 1;
+void key_up(unsigned char key, int x, int y){
+    keys[key] = 0;
 }
 
+void key_down(unsigned char key, int x, int y){
+    keys[key] = 1;
+}
 
 void plot_init(){
   plot_sizex = 640;
   plot_sizey = 640;
   win = 0;
   plot_init_opengl();
+  int i;
+  for (i=0; i<256; i++)
+    keys[i] = 0;
 }
 
 void plot_clean(){
@@ -43,7 +48,8 @@ void plot_init_opengl(){
 
   glDisable(GL_DEPTH_TEST);
   glClearColor(1.0, 1.0, 1.0, 0.0);	/* set background to white */
-  glutKeyboardFunc(exit_key);
+  glutKeyboardFunc(key_down);
+  glutKeyboardUpFunc(key_up);
   glViewport(0,0,plot_sizex, plot_sizey);
 
   glutMainLoopEvent();
@@ -60,7 +66,7 @@ int plot_clear_screen(){
 }
 
 
-int plot_render_particles(double *x, double *rad, int *type, long N, double L, double *shade){
+int *plot_render_particles(double *x, double *rad, int *type, long N, double L, double *shade){
     // focus on the part of scene where we draw nice
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -110,7 +116,7 @@ int plot_render_particles(double *x, double *rad, int *type, long N, double L, d
         glVertex2f(tx, ty);
         #else
         double rx = rad[i];
-        uint secs = 15;
+        int secs = 15;
         plot_set_draw_color(cr,cg,cb,ca);
         glBegin(GL_POLYGON);
         for (t=0; t<2*pi; t+=2*pi/secs)
@@ -130,20 +136,7 @@ int plot_render_particles(double *x, double *rad, int *type, long N, double L, d
     glutSwapBuffers();
     glutMainLoopEvent();
 
-    if (commence_exit == 1){
-      commence_exit = 0;
-      return 1;
-    }
-    return 0;
-}
-
-int plot_exit_func(){
-    glutMainLoopEvent();
-    if (commence_exit == 1){
-        commence_exit = 0;
-        return 1;
-    }
-    return 0;
+    return keys;
 }
 
 void plot_set_draw_color(float cr, float cg, float cb, float ca){
