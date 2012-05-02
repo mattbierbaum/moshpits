@@ -116,21 +116,21 @@ double vorticity(double *x, double *v, int *t, int N){
 void simulate(double alpha, double eta, int seed){
     ran_seed(seed);
     int  RIC  = 0;
-    double ff = 1;
+    //double ff = 1;
 
     int    NMAX    = 50;
-    int    N       = (int)(500*ff*ff);
-    double L       = 20.0;
-    double radius  = 0.2*2.5/ff;
+    int    N       = 500;//(int)(500*ff*ff);
+    double radius  = 1.0;//0.2*2.5/ff;
+    double L       = 1.03*sqrt(pi*radius*radius*N);//20.0;
 
     int pbc[] = {1,1};
 
-    double epsilon = 46.0;
+    double epsilon = 100.0;
     double T       = eta;//0.1;
     double speed   = alpha;//0.1;
 
     double vhappy_black = 0.0;
-    double vhappy_red   = 0.2;
+    double vhappy_red   = 1.0;
     double damp_coeff   = 1.0;
     double Tglobal      = 0.0;
 
@@ -159,7 +159,7 @@ void simulate(double alpha, double eta, int seed){
     #ifdef PLOT 
     double time_end = 1e20;
     #else
-    double time_end = 1e2;
+    double time_end = 1e3;
     #endif
 
     #ifdef PLOT 
@@ -225,6 +225,9 @@ void simulate(double alpha, double eta, int seed){
     #endif
 
     double vorticity_avg = 0.0;
+    double vorticity_std = 0.0;
+    double vorticity_sq_avg = 0.0;
+    double vorticity_sq_std = 0.0;
     int vorticity_count = 0;
 
     for (t=0.0; t<time_end; t+=dt){
@@ -391,8 +394,17 @@ void simulate(double alpha, double eta, int seed){
         #endif
         frames++;
 
-        vorticity_avg += vorticity(x,v,type,N);
         vorticity_count++;
+        
+        double vtemp     = vorticity(x,v,type,N);
+        double delta     = vtemp    - vorticity_avg;
+        vorticity_avg    = vorticity_avg    + delta    / vorticity_count; 
+        vorticity_std    = vorticity_std    + delta    * (vtemp    - vorticity_avg);
+        
+        double vtemp_sq  = vtemp*vtemp;
+        double delta_sq  = vtemp_sq - vorticity_sq_avg;
+        vorticity_sq_avg = vorticity_sq_avg + delta_sq / vorticity_count;
+        vorticity_sq_std = vorticity_sq_std + delta_sq * (vtemp_sq - vorticity_sq_avg);
 
         #ifdef PLOT
         if (key['k'] == 1)
@@ -439,7 +451,10 @@ void simulate(double alpha, double eta, int seed){
     printf("fps = %f\n", frames/((end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec)/1e9));
     #endif
 
-    printf("%f\n", vorticity_avg/vorticity_count);
+    vorticity_std    = vorticity_std    / (vorticity_count - 1);
+    vorticity_sq_std = vorticity_sq_std / (vorticity_count - 1);
+  
+    printf("%f %f %f %f\n", vorticity_avg, sqrt(vorticity_std), vorticity_sq_avg, sqrt(vorticity_sq_std));
 
     free(cells);
     free(count);

@@ -1,7 +1,7 @@
 # change this to 1 or 0 depending if you want a pretty plot,
 # not sure what you want otherwise
 DOPLOT = 0
-FPS    = 1
+FPS    = 0
 POINTS = 0
 OPENMP = 0
 
