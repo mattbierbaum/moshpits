@@ -11,19 +11,22 @@
 #include <time.h>
 #endif
 
+//===========================================
+// do we want to record various measurements?
+//#define VORTICITY_TIMESERIES
+//#define VELOCITY_DISTRIBUTION
+//#define TEMPERATURE_BINS
+//===========================================
+
+//-----------------------------------------------------------
+// some defines and what not 
+//------------------------------------------------------------
 #define pi      3.141592653589
 #define BLACK   0
 #define RED     1
 #define EPSILON DBL_EPSILON
 #define eps EPSILON 
 
-//#define VORTICITY_TIMESERIES
-//#define VELOCITY_DISTRIBUTION
-//#define TEMPERATURE_BINS
-
-//-----------------------------------------------------------
-// some defines and what not 
-//------------------------------------------------------------
 typedef unsigned long long int ullong;
 void   ran_seed(long j);
 double ran_ran2();
@@ -116,7 +119,7 @@ double vorticity(double *x, double *v, int *t, int N){
 #define BINS 50
 int bins[RADS][BINS];
 
-double temperature(double *x, double *v, int *t, int N, double L){
+void temperature(double *x, double *v, int *t, int N, double L){
     int i=0;
     double cmx = 0.0;
     double cmy = 0.0;
@@ -146,7 +149,6 @@ double temperature(double *x, double *v, int *t, int N, double L){
             }
         }
     }
-    return 0.0;
 }
 #endif
 
@@ -156,7 +158,6 @@ double temperature(double *x, double *v, int *t, int N, double L){
 void simulate(double alpha, double eta, int seed){
     ran_seed(seed);
     int  RIC  = 0;
-    //double ff = 1;
 
     int    NMAX    = 50;
     int    N       = 1000;
@@ -174,12 +175,12 @@ void simulate(double alpha, double eta, int seed){
     double damp_coeff   = 1.0;
     double Tglobal      = 0.0;
 
-    double dt = 1e-1;
-    double t  = 0.0;
-    double R  = 2*radius; 
-    double R2 = R*R;
-    double FR = 2*R;
-    double FR2= FR*FR;
+    double dt  = 1e-1;
+    double t   = 0.0;
+    double R   = 2*radius; 
+    double R2  = R*R;
+    double FR  = 2*R;
+    double FR2 = FR*FR;
 
     int i, j, k;
 
@@ -264,8 +265,8 @@ void simulate(double alpha, double eta, int seed){
     clock_gettime(CLOCK_REALTIME, &start);
     #endif
 
-    double vorticity_avg = 0.0;
-    double vorticity_std = 0.0;
+    double vorticity_avg    = 0.0;
+    double vorticity_std    = 0.0;
     double vorticity_sq_avg = 0.0;
     double vorticity_sq_std = 0.0;
     int vorticity_count = 0;
