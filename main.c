@@ -15,12 +15,16 @@
 #define BLACK   0
 #define RED     1
 #define EPSILON DBL_EPSILON
+#define eps EPSILON 
 
-typedef unsigned long long int ullong;
+//#define VORTICITY_TIMESERIES
+//#define VELOCITY_DISTRIBUTION
+//#define TEMPERATURE_BINS
 
 //-----------------------------------------------------------
 // some defines and what not 
 //------------------------------------------------------------
+typedef unsigned long long int ullong;
 void   ran_seed(long j);
 double ran_ran2();
 ullong vseed;
@@ -28,8 +32,6 @@ ullong vran;
 
 void simulate(double a, double e, int s);
 void init_circle(double *x, double *v, int *t, double s, long N, double L);
-
-double eps = EPSILON; 
 
 inline double mymod(double a, double b){
   return a - b*(int)(a/b) + b*(a<0);
@@ -102,13 +104,51 @@ double vorticity(double *x, double *v, int *t, int N){
             double vx = v[2*i+0];
             double vy = v[2*i+1];
             double tv = vx*ty - vy*tx;
-            vor += tv/sqrt(tx*tx+ty*ty);
+            vor += tv;//sqrt(tx*tx+ty*ty);
         }
     }
 
     return vor/count;
 }
 
+#ifdef TEMPERATURE_BINS
+#define RADS 10
+#define BINS 50
+int bins[RADS][BINS];
+
+double temperature(double *x, double *v, int *t, int N, double L){
+    int i=0;
+    double cmx = 0.0;
+    double cmy = 0.0;
+    int count = 0;
+
+    for (i=0; i<N; i++){
+        if (t[i] == RED){
+            cmx += x[2*i+0];
+            cmy += x[2*i+1];    
+            count++;
+        }
+    }
+    cmx /= count;
+    cmy /= count;
+
+    for (i=0; i<N; i++){
+        if (t[i] == RED){
+            double dx = x[2*i+0] - cmx;
+            double dy = x[2*i+1] - cmy;
+            double rr = sqrt(dx*dx + dy*dy);
+            double vv = sqrt(v[2*i+0]*v[2*i+0] + v[2*i+1]*v[2*i+1]);
+
+            int rad = RADS * 2*rr/L;
+            int bin = BINS * vv/3;
+            if (rad < RADS && bin < BINS){
+                bins[rad][bin]++;
+            }
+        }
+    }
+    return 0.0;
+}
+#endif
 
 //==================================================
 // simulation
@@ -119,15 +159,15 @@ void simulate(double alpha, double eta, int seed){
     //double ff = 1;
 
     int    NMAX    = 50;
-    int    N       = 500;//(int)(500*ff*ff);
-    double radius  = 1.0;//0.2*2.5/ff;
-    double L       = 1.03*sqrt(pi*radius*radius*N);//20.0;
+    int    N       = 1000;
+    double radius  = 1.0;
+    double L       = 1.05*sqrt(pi*radius*radius*N);
 
     int pbc[] = {1,1};
 
     double epsilon = 100.0;
-    double T       = eta;//0.1;
-    double speed   = alpha;//0.1;
+    double T       = eta;
+    double speed   = alpha;
 
     double vhappy_black = 0.0;
     double vhappy_red   = 1.0;
@@ -159,7 +199,7 @@ void simulate(double alpha, double eta, int seed){
     #ifdef PLOT 
     double time_end = 1e20;
     #else
-    double time_end = 1e3;
+    double time_end = 2e3;
     #endif
 
     #ifdef PLOT 
@@ -230,6 +270,33 @@ void simulate(double alpha, double eta, int seed){
     double vorticity_sq_std = 0.0;
     int vorticity_count = 0;
 
+    double momentumx_avg = 0.0;
+    double momentumx_std = 0.0;
+    double momentumy_avg = 0.0;
+    double momentumy_std = 0.0;
+    int momentum_count = 0;
+    
+
+    #ifdef VORTICITY_TIMESERIES
+    FILE *file1 = fopen("vorticity.txt", "wb");
+    #endif
+
+    #ifdef VELOCITY_DISTRIBUTION
+    FILE *file2 = fopen("velocities.txt", "wb");
+    #endif
+
+    #ifdef TEMPERATURE_BINS 
+    char name[80];
+    sprintf(name, "temp_%0.2f.txt", damp_coeff);
+    FILE *file3 = fopen(name, "w");
+    for (i=0; i<RADS; i++){
+        for (j=0; j<BINS; j++){
+            bins[i][j] = 0;
+        }
+    }
+    #endif
+
+    int showplot = 1;
     for (t=0.0; t<time_end; t+=dt){
 
         int index[2];
@@ -295,7 +362,7 @@ void simulate(double alpha, double eta, int seed){
                             co = epsilon * (1-l/r0)*(1-l/r0) * (l<r0);
                             for (k=0; k<2; k++){
                                 f[2*i+k] += - dx[k] * co;
-                                col[i] += co*co*dx[k]*dx[k]; 
+                                col[i] += 0.0;//co*co*dx[k]*dx[k]; 
                             }
                         }
                         //===============================================
@@ -329,8 +396,10 @@ void simulate(double alpha, double eta, int seed){
             //=======================================
             // noise term
             if (type[i] == RED){
-                f[2*i+0] += T*(ran_ran2()-0.5);
-                f[2*i+1] += T*(ran_ran2()-0.5);
+                double rt1 = T*ran_ran2();
+                double rt2 = 2*pi*ran_ran2();
+                f[2*i+0] += T * cos(rt2);//T*(ran_ran2()-0.5);
+                f[2*i+1] += T * sin(rt2);//T*(ran_ran2()-0.5);
             }
 
             f[2*i+0] += Tglobal*(ran_ran2()-0.5);
@@ -363,6 +432,11 @@ void simulate(double alpha, double eta, int seed){
             }   
             #endif
 
+            #ifdef VELOCITY_DISTRIBUTION
+            double ttt = sqrt(v[2*i+0]*v[2*i+0] + v[2*i+1]*v[2*i+1]) ;
+            fwrite(&ttt, sizeof(double), 1, file2);
+            #endif
+
             // boundary conditions 
             for (j=0; j<2; j++){
                 if (pbc[j] == 1){
@@ -389,10 +463,16 @@ void simulate(double alpha, double eta, int seed){
         #endif
 
         #ifdef PLOT 
+        if (frames % 100 == 0){
             plot_clear_screen();
             key = plot_render_particles(x, rad, type, N, L,col);
+        }
         #endif
         frames++;
+
+        #ifdef TEMPERATURE_BINS
+        temperature(x, v, type, N, L);
+        #endif
 
         vorticity_count++;
         
@@ -406,7 +486,35 @@ void simulate(double alpha, double eta, int seed){
         vorticity_sq_avg = vorticity_sq_avg + delta_sq / vorticity_count;
         vorticity_sq_std = vorticity_sq_std + delta_sq * (vtemp_sq - vorticity_sq_avg);
 
+
+        double linearmomx = 0.0;
+        double linearmomy = 0.0;
+        int linearmomc = 0;
+        for (i=0; i<N; i++){
+            if (type[i] == RED){
+                linearmomx += v[2*i+0];
+                linearmomy += v[2*i+1];
+                linearmomc++;
+            }
+        }
+        linearmomx /= linearmomc;
+        linearmomy /= linearmomc;
+        momentum_count++;
+
+        double deltax = linearmomx - momentumx_avg;
+        double deltay = linearmomy - momentumy_avg;
+        momentumx_avg = momentumx_avg + deltax / momentum_count;
+        momentumy_avg = momentumy_avg + deltay / momentum_count;
+        momentumx_std = momentumx_std + deltax * (linearmomx - momentumx_avg);
+        momentumy_std = momentumy_std + deltay * (linearmomy - momentumy_avg);
+
+        #ifdef VORTICITY_TIMESERIES
+        fwrite(&vtemp, sizeof(double), 1, file1);
+        #endif
+
         #ifdef PLOT
+        if (key['f'] == 1)
+            showplot = !showplot;
         if (key['k'] == 1)
             vhappy_red = 0.0;
         if (key['q'] == 1)
@@ -451,10 +559,35 @@ void simulate(double alpha, double eta, int seed){
     printf("fps = %f\n", frames/((end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec)/1e9));
     #endif
 
+    #ifdef VORTICITY_TIMESERIES
+    fclose(file1);
+    #endif
+
+    #ifdef VELOCITY_DISTRIBUTION
+    fclose(file2);
+    #endif
+
+    #ifdef TEMPERATURE_BINS
+    for (i=0; i<RADS; i++){
+        for (j=0; j<BINS; j++){
+            fprintf(file3, "%i ", bins[i][j]);
+        }
+        fprintf(file3, "\n");
+    }
+    fclose(file3);
+    #endif
+
+    printf("tend = %f\n", t);
     vorticity_std    = vorticity_std    / (vorticity_count - 1);
     vorticity_sq_std = vorticity_sq_std / (vorticity_count - 1);
-  
-    printf("%f %f %f %f\n", vorticity_avg, sqrt(vorticity_std), vorticity_sq_avg, sqrt(vorticity_sq_std));
+ 
+    momentumx_std = momentumx_std / (momentum_count - 1);
+    momentumy_std = momentumy_std / (momentum_count - 1);
+ 
+    printf("%f %f %f %f %f %f %f %f\n", vorticity_avg, sqrt(vorticity_std), 
+                                        vorticity_sq_avg, sqrt(vorticity_sq_std), 
+                                        momentumx_avg, sqrt(momentumx_std), 
+                                        momentumy_avg, sqrt(momentumy_std));
 
     free(cells);
     free(count);
@@ -504,12 +637,15 @@ void init_circle(double *x, double *v,
         x[2*i+0] = tx;
         x[2*i+1] = ty;
         
-        double dd = sqrt((tx-L/2)*(tx-L/2) + (ty-L/2)*(ty-L/2));
-
         // the radius for which 30% of the particles are red on avg
+        double dd = sqrt((tx-L/2)*(tx-L/2) + (ty-L/2)*(ty-L/2));
         double rad = sqrt(0.15*L*L / pi);
+
+        //if (i<0.15*N)
         if (dd < rad)
             type[i] = RED;
+        else
+            type[i] = BLACK;
 
         if (type[i] == RED){
             v[2*i+0] = speed*cos(tt);
