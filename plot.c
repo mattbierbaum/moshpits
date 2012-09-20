@@ -66,7 +66,8 @@ int plot_clear_screen(){
 }
 
 
-int *plot_render_particles(double *x, double *rad, int *type, long N, double L, double *shade){
+int *plot_render_particles(double *x, double *rad, int *type, long N, double L, double *shade, 
+                           double cmx, double cmy, int docom){
     // focus on the part of scene where we draw nice
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -140,6 +141,22 @@ int *plot_render_particles(double *x, double *rad, int *type, long N, double L, 
     //#pragma omp barrier
     #endif
 
+    if (docom == 1){
+        double rx = 2;
+        int secs = 15;
+        double t;
+        glColor4f(1.0,1.0,1.0,1.0);
+        glBegin(GL_POLYGON);
+        for (t=0; t<2*pi; t+=2*pi/secs)
+          glVertex2f(cmx + rx*cos(t), cmy + rx*sin(t));
+        glEnd();
+        glColor4f(0.0,0.0,0.0,1.0);
+        glBegin(GL_LINE_LOOP);
+        for (t=0; t<2*pi; t+=2*pi/secs)
+          glVertex2f(cmx + rx*cos(t), cmy + rx*sin(t));
+        glEnd();
+    }
+ 
     #ifdef POINTS
     glEnd();
     #endif

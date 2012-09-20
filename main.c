@@ -13,7 +13,7 @@
 
 //===========================================
 // do we want to record various measurements?
-//#define VORTICITY_TIMESERIES
+//#define ANGULARMOM_TIMESERIES
 //#define VELOCITY_DISTRIBUTION
 //#define TEMPERATURE_BINS
 //===========================================
@@ -32,7 +32,8 @@ void simulate(double a, double e, int s);
 
 void   init_circle(double *x, double *v, int *t, double s, long N, double L);
 void   temperature(double *x, double *v, int *t, int N, double L, int bins[RADS][BINS]);
-double angularmom(double *x, double *v, int *t, int N);
+void   centerofmass(double *x, int *t, int N, double L, double *cmx, double *cmy);
+double angularmom(double *x, double *v, int *t, int N, double L);
 
 void   coords_to_index(double *x, int *size, int *index, double L);
 int    mod_rvec(int a, int b, int p, int *image);
@@ -125,7 +126,7 @@ void simulate(double alpha, double eta, int seed){
         double kickforce = 2.0;
         plot_init(); 
         plot_clear_screen();
-        key = plot_render_particles(x, rad, type, N, L,col);
+        key = plot_render_particles(x, rad, type, N, L,col,0,0,0);
     #endif
 
     //-------------------------------------------------
@@ -195,7 +196,7 @@ void simulate(double alpha, double eta, int seed){
     int momentum_count = 0;
     
 
-    #ifdef VORTICITY_TIMESERIES
+    #ifdef ANGULARMOM_TIMESERIES
     FILE *file1 = fopen("angularmom.txt", "wb");
     #endif
 
@@ -381,9 +382,11 @@ void simulate(double alpha, double eta, int seed){
         #endif
 
         #ifdef PLOT 
-        if (frames % 100 == 0){
+        if (frames % 10 == 0){
+            double cmx, cmy;
+            centerofmass(x, type, N, L, &cmx, &cmy);
             plot_clear_screen();
-            key = plot_render_particles(x, rad, type, N, L,col);
+            key = plot_render_particles(x, rad, type, N, L,col, cmx, cmy, 0);
         }
         #endif
         frames++;
@@ -394,7 +397,7 @@ void simulate(double alpha, double eta, int seed){
 
         angularmom_count++;
         
-        double vtemp     = angularmom(x,v,type,N);
+        double vtemp     = angularmom(x,v,type,N,L);
         double delta     = vtemp    - angularmom_avg;
         angularmom_avg    = angularmom_avg    + delta    / angularmom_count; 
         angularmom_std    = angularmom_std    + delta    * (vtemp    - angularmom_avg);
@@ -426,7 +429,7 @@ void simulate(double alpha, double eta, int seed){
         momentumx_std = momentumx_std + deltax * (linearmomx - momentumx_avg);
         momentumy_std = momentumy_std + deltay * (linearmomy - momentumy_avg);
 
-        #ifdef VORTICITY_TIMESERIES
+        #ifdef ANGULARMOM_TIMESERIES
         fwrite(&vtemp, sizeof(double), 1, file1);
         #endif
 
@@ -477,7 +480,7 @@ void simulate(double alpha, double eta, int seed){
     printf("fps = %f\n", frames/((end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec)/1e9));
     #endif
 
-    #ifdef VORTICITY_TIMESERIES
+    #ifdef ANGULARMOM_TIMESERIES
     fclose(file1);
     #endif
 
@@ -607,22 +610,38 @@ inline int mod_rvec(int a, int b, int p, int *image){
 //==========================================
 // measurement functions
 //=========================================
-double angularmom(double *x, double *v, int *t, int N){
+void centerofmass(double *x, int *t, int N, double L, double *cmx, double *cmy){
+    int i;
+    double xreal = 0.0;
+    double ximag = 0.0;
+    double yreal = 0.0;
+    double yimag = 0.0;
+
+    for (i=0; i<N; i++){
+        if (t[i] == RED){
+            xreal += cos(2*pi/L * x[2*i+0]);
+            ximag += sin(2*pi/L * x[2*i+0]);
+            yreal += cos(2*pi/L * x[2*i+1]);
+            yimag += sin(2*pi/L * x[2*i+1]);
+        }
+    }
+
+    *cmx = atan2(ximag,xreal)/(2*pi) * L;
+    *cmy = atan2(yimag,yreal)/(2*pi) * L;
+
+    if (*cmx < 0) *cmx += L;
+    if (*cmy < 0) *cmy += L;
+}
+
+
+double angularmom(double *x, double *v, int *t, int N, double L){
     int i=0;
     double ang = 0.0;
     double cmx = 0.0;
     double cmy = 0.0;
     int count = 0;
 
-    for (i=0; i<N; i++){
-        if (t[i] == RED){
-            cmx += x[2*i+0];
-            cmy += x[2*i+1];    
-            count++;
-        }
-    }
-    cmx /= count;
-    cmy /= count;
+    centerofmass(x, t, N, L, &cmx, &cmy);
 
     for (i=0; i<N; i++){
         if (t[i] == RED){
@@ -632,6 +651,7 @@ double angularmom(double *x, double *v, int *t, int N){
             double vy = v[2*i+1];
             double tv = vx*ty - vy*tx;
             ang += tv;
+            count++;
         }
     }
 
@@ -645,15 +665,7 @@ void temperature(double *x, double *v, int *t, int N, double L, int bins[RADS][B
     double cmy = 0.0;
     int count = 0;
 
-    for (i=0; i<N; i++){
-        if (t[i] == RED){
-            cmx += x[2*i+0];
-            cmy += x[2*i+1];    
-            count++;
-        }
-    }
-    cmx /= count;
-    cmy /= count;
+    centerofmass(x, t, N, L, &cmx, &cmy);
 
     for (i=0; i<N; i++){
         if (t[i] == RED){
@@ -667,6 +679,7 @@ void temperature(double *x, double *v, int *t, int N, double L, int bins[RADS][B
             if (rad < RADS && bin < BINS){
                 bins[rad][bin]++;
             }
+            count++;
         }
     }
 }
