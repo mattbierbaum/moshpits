@@ -11,4 +11,6 @@ with other systems (edit as necessary):
 To compile, simply do:
  - make
 
+NOTE: all helper scripts should be run from the project root directory.
+
 Check out the related project at <a href="http://github.com/mattbierbaum/moshpits.js">Moshpits.js</a>
