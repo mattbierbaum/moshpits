@@ -31,9 +31,9 @@
 void simulate(double a, double e, int s);
 
 void   init_circle(double *x, double *v, int *t, double s, long N, double L);
-void   temperature(double *x, double *v, int *t, int N, double L, int bins[RADS][BINS]);
+void   temperature(double *x, double *v, int *t, int N, double L, int *pbc, int bins[RADS][BINS]);
 void   centerofmass(double *x, int *t, int N, double L, double *cmx, double *cmy);
-double angularmom(double *x, double *v, int *t, int N, double L);
+double angularmom(double *x, double *v, int *t, int N, double L, int *pbc);
 
 void   coords_to_index(double *x, int *size, int *index, double L);
 int    mod_rvec(int a, int b, int p, int *image);
@@ -126,7 +126,7 @@ void simulate(double alpha, double eta, int seed){
         double kickforce = 2.0;
         plot_init(); 
         plot_clear_screen();
-        key = plot_render_particles(x, rad, type, N, L,col,0,0,0);
+        key = plot_render_particles(x, rad, type, N, L,col,0,0,0, pbc);
     #endif
 
     //-------------------------------------------------
@@ -386,18 +386,18 @@ void simulate(double alpha, double eta, int seed){
             double cmx, cmy;
             centerofmass(x, type, N, L, &cmx, &cmy);
             plot_clear_screen();
-            key = plot_render_particles(x, rad, type, N, L,col, cmx, cmy, 0);
+            key = plot_render_particles(x, rad, type, N, L,col, cmx, cmy, 0, pbc);
         }
         #endif
         frames++;
 
         #ifdef TEMPERATURE_BINS
-        temperature(x, v, type, N, L, bins);
+        temperature(x, v, type, N, L, pbc, bins);
         #endif
 
         angularmom_count++;
         
-        double vtemp     = angularmom(x,v,type,N,L);
+        double vtemp     = angularmom(x,v,type,N,L,pbc);
         double delta     = vtemp    - angularmom_avg;
         angularmom_avg    = angularmom_avg    + delta    / angularmom_count; 
         angularmom_std    = angularmom_std    + delta    * (vtemp    - angularmom_avg);
@@ -634,7 +634,7 @@ void centerofmass(double *x, int *t, int N, double L, double *cmx, double *cmy){
 }
 
 
-double angularmom(double *x, double *v, int *t, int N, double L){
+double angularmom(double *x, double *v, int *t, int N, double L, int *pbc){
     int i=0;
     double ang = 0.0;
     double cmx = 0.0;
@@ -647,6 +647,12 @@ double angularmom(double *x, double *v, int *t, int N, double L){
         if (t[i] == RED){
             double tx = x[2*i+0] - cmx;
             double ty = x[2*i+1] - cmy;
+            
+            if (pbc[0] && tx > L/2)  tx -= L;
+            if (pbc[1] && ty > L/2)  ty -= L;
+            if (pbc[0] && tx < -L/2) tx += L;
+            if (pbc[1] && ty < -L/2) ty += L;
+    
             double vx = v[2*i+0];
             double vy = v[2*i+1];
             double tv = vx*ty - vy*tx;
@@ -659,7 +665,7 @@ double angularmom(double *x, double *v, int *t, int N, double L){
 }
 
 
-void temperature(double *x, double *v, int *t, int N, double L, int bins[RADS][BINS]){
+void temperature(double *x, double *v, int *t, int N, double L, int *pbc, int bins[RADS][BINS]){
     int i=0;
     double cmx = 0.0;
     double cmy = 0.0;
@@ -671,6 +677,11 @@ void temperature(double *x, double *v, int *t, int N, double L, int bins[RADS][B
         if (t[i] == RED){
             double dx = x[2*i+0] - cmx;
             double dy = x[2*i+1] - cmy;
+            if (pbc[0] && dx > L/2)  dx -= L;
+            if (pbc[1] && dy > L/2)  dy -= L;
+            if (pbc[0] && dx < -L/2) dx += L;
+            if (pbc[1] && dy < -L/2) dy += L;
+
             double rr = sqrt(dx*dx + dy*dy);
             double vv = sqrt(v[2*i+0]*v[2*i+0] + v[2*i+1]*v[2*i+1]);
 

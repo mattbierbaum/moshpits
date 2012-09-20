@@ -67,7 +67,7 @@ int plot_clear_screen(){
 
 
 int *plot_render_particles(double *x, double *rad, int *type, long N, double L, double *shade, 
-                           double cmx, double cmy, int docom){
+                           double cmx, double cmy, int docom, int *pbc){
     // focus on the part of scene where we draw nice
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -155,6 +155,22 @@ int *plot_render_particles(double *x, double *rad, int *type, long N, double L, 
         for (t=0; t<2*pi; t+=2*pi/secs)
           glVertex2f(cmx + rx*cos(t), cmy + rx*sin(t));
         glEnd();
+
+        for (i=0; i<N; i++){
+            if (type[i] == 1){
+                double tx = x[2*i+0] - cmx;
+                double ty = x[2*i+1] - cmy;
+                
+                if (pbc[0] && tx > L/2)  tx -= L;
+                if (pbc[1] && ty > L/2)  ty -= L;
+                if (pbc[0] && tx < -L/2) tx += L;
+                if (pbc[1] && ty < -L/2) ty += L;
+                glBegin(GL_LINE_LOOP);
+                glVertex2f(x[2*i+0], x[2*i+1]);
+                glVertex2f(x[2*i+0]-tx, x[2*i+1]-ty);
+                glEnd();
+            }
+        }
     }
  
     #ifdef POINTS
