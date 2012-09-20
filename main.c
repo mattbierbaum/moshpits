@@ -16,6 +16,7 @@
 //#define ANGULARMOM_TIMESERIES
 //#define VELOCITY_DISTRIBUTION
 //#define TEMPERATURE_BINS
+#define SHOWCENTEROFMASS 0
 //===========================================
 
 //-----------------------------------------------------------
@@ -118,7 +119,7 @@ void simulate(double alpha, double eta, int seed){
     #ifdef PLOT 
     double time_end = 1e20;
     #else
-    double time_end = 2e3;
+    double time_end = 1e3;
     #endif
 
     #ifdef PLOT 
@@ -390,14 +391,10 @@ void simulate(double alpha, double eta, int seed){
             double cmx, cmy;
             centerofmass(x, type, N, L, &cmx, &cmy);
             plot_clear_screen();
-            key = plot_render_particles(x, rad, type, N, L,col, cmx, cmy, 0, pbc);
+            key = plot_render_particles(x, rad, type, N, L,col, cmx, cmy, SHOWCENTEROFMASS, pbc);
         }
         #endif
         frames++;
-
-        #ifdef TEMPERATURE_BINS
-        temperature(x, v, type, N, L, pbc, bins);
-        #endif
 
         angularmom_count++;
         
@@ -442,6 +439,9 @@ void simulate(double alpha, double eta, int seed){
         momentumsqx_std = momentumsqx_std + deltasqx * (linearmomsqx - momentumsqx_avg);
         momentumsqy_std = momentumsqy_std + deltasqy * (linearmomsqy - momentumsqy_avg);
 
+        #ifdef TEMPERATURE_BINS
+        temperature(x, v, type, N, L, pbc, bins);
+        #endif
 
         #ifdef ANGULARMOM_TIMESERIES
         fwrite(&vtemp, sizeof(double), 1, file1);
