@@ -523,7 +523,7 @@ void simulate(double alpha, double eta, int seed){
                                         angularmom_avg, sqrt(angularmom_std), 
                                         angularmom_sq_avg, sqrt(angularmom_sq_std), 
                                         momentumx_avg, sqrt(momentumx_std), 
-                                        momentumy_avg, sqrt(momentumy_std)
+                                        momentumy_avg, sqrt(momentumy_std),
                                         momentumsqx_avg, sqrt(momentumsqx_std),
                                         momentumsqy_avg, sqrt(momentumsqy_std));
 

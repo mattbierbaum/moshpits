@@ -1,0 +1,5 @@
+#!/bin/bash
+for i in `cat hostfile`
+do 
+    cat runs.txt.nws20 >> runs.txt
+done
