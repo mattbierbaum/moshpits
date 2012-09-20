@@ -128,6 +128,7 @@ void simulate(double alpha, double eta, int seed){
         plot_init(); 
         plot_clear_screen();
         key = plot_render_particles(x, rad, type, N, L,col,0,0,0, pbc);
+        int showplot = 1;
     #endif
 
     //-------------------------------------------------
@@ -221,7 +222,6 @@ void simulate(double alpha, double eta, int seed){
     }
     #endif
 
-    int showplot = 1;
     for (t=0.0; t<time_end; t+=dt){
 
         int index[2];
@@ -512,7 +512,7 @@ void simulate(double alpha, double eta, int seed){
     fclose(file3);
     #endif
 
-    printf("tend = %f\n", t);
+    //printf("tend = %f\n", t);
     angularmom_std    = angularmom_std    / (angularmom_count - 1);
     angularmom_sq_std = angularmom_sq_std / (angularmom_count - 1);
  
