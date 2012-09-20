@@ -19,45 +19,30 @@
 //===========================================
 
 //-----------------------------------------------------------
-// some defines and what not 
+// some defines and helper functions for NBL
 //------------------------------------------------------------
 #define pi      3.141592653589
+#define EPSILON DBL_EPSILON
 #define BLACK   0
 #define RED     1
-#define EPSILON DBL_EPSILON
-#define eps EPSILON 
-
-typedef unsigned long long int ullong;
-void   ran_seed(long j);
-double ran_ran2();
-ullong vseed;
-ullong vran;
+#define RADS    10
+#define BINS    50
 
 void simulate(double a, double e, int s);
-void init_circle(double *x, double *v, int *t, double s, long N, double L);
 
-inline double mymod(double a, double b){
-  return a - b*(int)(a/b) + b*(a<0);
-}
+void   init_circle(double *x, double *v, int *t, double s, long N, double L);
+void   temperature(double *x, double *v, int *t, int N, double L, int bins[RADS][BINS]);
+double angularmom(double *x, double *v, int *t, int N);
 
-inline void coords_to_index(double *x, int *size, int *index, double L){   
-    index[0] = (int)(x[0]/L  * size[0]);
-    index[1] = (int)(x[1]/L  * size[1]);
-}
+void   coords_to_index(double *x, int *size, int *index, double L);
+int    mod_rvec(int a, int b, int p, int *image);
+double mymod(double a, double b);
 
-inline int mod_rvec(int a, int b, int p, int *image){
-    *image = 1;
-    if (b==0) {if (a==0) *image=0; return 0;}
-    if (p != 0){
-        if (a>b)  return a-b-1;
-        if (a<0)  return a+b+1;
-    } else {
-        if (a>b)  return b;
-        if (a<0)  return 0;
-    }
-    *image = 0;
-    return a;
-}
+void   ran_seed(long j);
+double ran_ran2();
+unsigned long long int vseed;
+unsigned long long int vran;
+
 
 //===================================================
 // the main function
@@ -83,74 +68,6 @@ int main(int argc, char **argv){
 }
 
 
-double vorticity(double *x, double *v, int *t, int N){
-    int i=0;
-    double vor = 0.0;
-    double cmx = 0.0;
-    double cmy = 0.0;
-    int count = 0;
-
-    for (i=0; i<N; i++){
-        if (t[i] == RED){
-            cmx += x[2*i+0];
-            cmy += x[2*i+1];    
-            count++;
-        }
-    }
-    cmx /= count;
-    cmy /= count;
-
-    for (i=0; i<N; i++){
-        if (t[i] == RED){
-            double tx = x[2*i+0] - cmx;
-            double ty = x[2*i+1] - cmy;
-            double vx = v[2*i+0];
-            double vy = v[2*i+1];
-            double tv = vx*ty - vy*tx;
-            vor += tv;//sqrt(tx*tx+ty*ty);
-        }
-    }
-
-    return vor/count;
-}
-
-#ifdef TEMPERATURE_BINS
-#define RADS 10
-#define BINS 50
-int bins[RADS][BINS];
-
-void temperature(double *x, double *v, int *t, int N, double L){
-    int i=0;
-    double cmx = 0.0;
-    double cmy = 0.0;
-    int count = 0;
-
-    for (i=0; i<N; i++){
-        if (t[i] == RED){
-            cmx += x[2*i+0];
-            cmy += x[2*i+1];    
-            count++;
-        }
-    }
-    cmx /= count;
-    cmy /= count;
-
-    for (i=0; i<N; i++){
-        if (t[i] == RED){
-            double dx = x[2*i+0] - cmx;
-            double dy = x[2*i+1] - cmy;
-            double rr = sqrt(dx*dx + dy*dy);
-            double vv = sqrt(v[2*i+0]*v[2*i+0] + v[2*i+1]*v[2*i+1]);
-
-            int rad = RADS * 2*rr/L;
-            int bin = BINS * vv/3;
-            if (rad < RADS && bin < BINS){
-                bins[rad][bin]++;
-            }
-        }
-    }
-}
-#endif
 
 //==================================================
 // simulation
@@ -265,11 +182,11 @@ void simulate(double alpha, double eta, int seed){
     clock_gettime(CLOCK_REALTIME, &start);
     #endif
 
-    double vorticity_avg    = 0.0;
-    double vorticity_std    = 0.0;
-    double vorticity_sq_avg = 0.0;
-    double vorticity_sq_std = 0.0;
-    int vorticity_count = 0;
+    double angularmom_avg    = 0.0;
+    double angularmom_std    = 0.0;
+    double angularmom_sq_avg = 0.0;
+    double angularmom_sq_std = 0.0;
+    int angularmom_count = 0;
 
     double momentumx_avg = 0.0;
     double momentumx_std = 0.0;
@@ -279,7 +196,7 @@ void simulate(double alpha, double eta, int seed){
     
 
     #ifdef VORTICITY_TIMESERIES
-    FILE *file1 = fopen("vorticity.txt", "wb");
+    FILE *file1 = fopen("angularmom.txt", "wb");
     #endif
 
     #ifdef VELOCITY_DISTRIBUTION
@@ -287,6 +204,7 @@ void simulate(double alpha, double eta, int seed){
     #endif
 
     #ifdef TEMPERATURE_BINS 
+    int bins[RADS][BINS];
     char name[80];
     sprintf(name, "temp_%0.2f.txt", damp_coeff);
     FILE *file3 = fopen(name, "w");
@@ -397,10 +315,9 @@ void simulate(double alpha, double eta, int seed){
             //=======================================
             // noise term
             if (type[i] == RED){
-                double rt1 = T*ran_ran2();
-                double rt2 = 2*pi*ran_ran2();
-                f[2*i+0] += T * cos(rt2);//T*(ran_ran2()-0.5);
-                f[2*i+1] += T * sin(rt2);//T*(ran_ran2()-0.5);
+                double rt = 2*pi*ran_ran2();
+                f[2*i+0] += T * cos(rt);
+                f[2*i+1] += T * sin(rt);
             }
 
             f[2*i+0] += Tglobal*(ran_ran2()-0.5);
@@ -448,7 +365,7 @@ void simulate(double alpha, double eta, int seed){
                     const double restoration = 1.0;
                     if (x[2*i+j] >= L){x[2*i+j] = 2*L-x[2*i+j]; v[2*i+j] *= -restoration;}
                     if (x[2*i+j] < 0) {x[2*i+j] = -x[2*i+j];    v[2*i+j] *= -restoration;}
-                    if (x[2*i+j] >= L-eps || x[2*i+j] < 0){x[2*i+j] = mymod(x[2*i+j], L);}
+                    if (x[2*i+j] >= L-EPSILON || x[2*i+j] < 0){x[2*i+j] = mymod(x[2*i+j], L);}
                 }
             }
 
@@ -472,20 +389,20 @@ void simulate(double alpha, double eta, int seed){
         frames++;
 
         #ifdef TEMPERATURE_BINS
-        temperature(x, v, type, N, L);
+        temperature(x, v, type, N, L, bins);
         #endif
 
-        vorticity_count++;
+        angularmom_count++;
         
-        double vtemp     = vorticity(x,v,type,N);
-        double delta     = vtemp    - vorticity_avg;
-        vorticity_avg    = vorticity_avg    + delta    / vorticity_count; 
-        vorticity_std    = vorticity_std    + delta    * (vtemp    - vorticity_avg);
+        double vtemp     = angularmom(x,v,type,N);
+        double delta     = vtemp    - angularmom_avg;
+        angularmom_avg    = angularmom_avg    + delta    / angularmom_count; 
+        angularmom_std    = angularmom_std    + delta    * (vtemp    - angularmom_avg);
         
         double vtemp_sq  = vtemp*vtemp;
-        double delta_sq  = vtemp_sq - vorticity_sq_avg;
-        vorticity_sq_avg = vorticity_sq_avg + delta_sq / vorticity_count;
-        vorticity_sq_std = vorticity_sq_std + delta_sq * (vtemp_sq - vorticity_sq_avg);
+        double delta_sq  = vtemp_sq - angularmom_sq_avg;
+        angularmom_sq_avg = angularmom_sq_avg + delta_sq / angularmom_count;
+        angularmom_sq_std = angularmom_sq_std + delta_sq * (vtemp_sq - angularmom_sq_avg);
 
 
         double linearmomx = 0.0;
@@ -579,14 +496,14 @@ void simulate(double alpha, double eta, int seed){
     #endif
 
     printf("tend = %f\n", t);
-    vorticity_std    = vorticity_std    / (vorticity_count - 1);
-    vorticity_sq_std = vorticity_sq_std / (vorticity_count - 1);
+    angularmom_std    = angularmom_std    / (angularmom_count - 1);
+    angularmom_sq_std = angularmom_sq_std / (angularmom_count - 1);
  
     momentumx_std = momentumx_std / (momentum_count - 1);
     momentumy_std = momentumy_std / (momentum_count - 1);
  
-    printf("%f %f %f %f %f %f %f %f\n", vorticity_avg, sqrt(vorticity_std), 
-                                        vorticity_sq_avg, sqrt(vorticity_sq_std), 
+    printf("%f %f %f %f %f %f %f %f\n", angularmom_avg, sqrt(angularmom_std), 
+                                        angularmom_sq_avg, sqrt(angularmom_sq_std), 
                                         momentumx_avg, sqrt(momentumx_std), 
                                         momentumy_avg, sqrt(momentumy_std));
 
@@ -623,7 +540,7 @@ void ran_seed(long j){
 
 double ran_ran2(){
     vran ^= vran >> 21; vran ^= vran << 35; vran ^= vran >> 4;
-    ullong t = vran * 2685821657736338717LL;
+    unsigned long long int t = vran * 2685821657736338717LL;
     return 5.42101086242752217e-20*t;
 }
 
@@ -659,4 +576,98 @@ void init_circle(double *x, double *v,
     }   
 } 
 
+//=======================================
+// NBL - neighborlist helper functions
+//=======================================
+inline double mymod(double a, double b){
+  return a - b*(int)(a/b) + b*(a<0);
+}
+
+inline void coords_to_index(double *x, int *size, int *index, double L){   
+    index[0] = (int)(x[0]/L  * size[0]);
+    index[1] = (int)(x[1]/L  * size[1]);
+}
+
+inline int mod_rvec(int a, int b, int p, int *image){
+    *image = 1;
+    if (b==0) {if (a==0) *image=0; return 0;}
+    if (p != 0){
+        if (a>b)  return a-b-1;
+        if (a<0)  return a+b+1;
+    } else {
+        if (a>b)  return b;
+        if (a<0)  return 0;
+    }
+    *image = 0;
+    return a;
+}
+
+
+
+//==========================================
+// measurement functions
+//=========================================
+double angularmom(double *x, double *v, int *t, int N){
+    int i=0;
+    double ang = 0.0;
+    double cmx = 0.0;
+    double cmy = 0.0;
+    int count = 0;
+
+    for (i=0; i<N; i++){
+        if (t[i] == RED){
+            cmx += x[2*i+0];
+            cmy += x[2*i+1];    
+            count++;
+        }
+    }
+    cmx /= count;
+    cmy /= count;
+
+    for (i=0; i<N; i++){
+        if (t[i] == RED){
+            double tx = x[2*i+0] - cmx;
+            double ty = x[2*i+1] - cmy;
+            double vx = v[2*i+0];
+            double vy = v[2*i+1];
+            double tv = vx*ty - vy*tx;
+            ang += tv;
+        }
+    }
+
+    return ang/count;
+}
+
+
+void temperature(double *x, double *v, int *t, int N, double L, int bins[RADS][BINS]){
+    int i=0;
+    double cmx = 0.0;
+    double cmy = 0.0;
+    int count = 0;
+
+    for (i=0; i<N; i++){
+        if (t[i] == RED){
+            cmx += x[2*i+0];
+            cmy += x[2*i+1];    
+            count++;
+        }
+    }
+    cmx /= count;
+    cmy /= count;
+
+    for (i=0; i<N; i++){
+        if (t[i] == RED){
+            double dx = x[2*i+0] - cmx;
+            double dy = x[2*i+1] - cmy;
+            double rr = sqrt(dx*dx + dy*dy);
+            double vv = sqrt(v[2*i+0]*v[2*i+0] + v[2*i+1]*v[2*i+1]);
+
+            int rad = RADS * 2*rr/L;
+            int bin = BINS * vv/3;
+            if (rad < RADS && bin < BINS){
+                bins[rad][bin]++;
+            }
+        }
+    }
+}
 
