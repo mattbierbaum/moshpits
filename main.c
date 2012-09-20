@@ -79,9 +79,9 @@ void simulate(double alpha, double eta, int seed){
     int  RIC  = 0;
 
     int    NMAX    = 50;
-    int    N       = 1000;
+    int    N       = 500;
     double radius  = 1.0;
-    double L       = 1.05*sqrt(pi*radius*radius*N);
+    double L       = 1.03*sqrt(pi*radius*radius*N);
 
     int pbc[] = {1,1};
 
