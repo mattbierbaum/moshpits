@@ -195,6 +195,10 @@ void simulate(double alpha, double eta, int seed){
     double momentumy_std = 0.0;
     int momentum_count = 0;
     
+    double momentumsqx_avg = 0.0;
+    double momentumsqx_std = 0.0;
+    double momentumsqy_avg = 0.0;
+    double momentumsqy_std = 0.0;
 
     #ifdef ANGULARMOM_TIMESERIES
     FILE *file1 = fopen("angularmom.txt", "wb");
@@ -429,6 +433,16 @@ void simulate(double alpha, double eta, int seed){
         momentumx_std = momentumx_std + deltax * (linearmomx - momentumx_avg);
         momentumy_std = momentumy_std + deltay * (linearmomy - momentumy_avg);
 
+        double linearmomsqx = linearmomx*linearmomx;
+        double linearmomsqy = linearmomy*linearmomy;
+        double deltasqx = linearmomsqx - momentumsqx_avg;
+        double deltasqy = linearmomsqy - momentumsqy_avg;
+        momentumsqx_avg = momentumsqx_avg + deltasqx / momentum_count;
+        momentumsqy_avg = momentumsqy_avg + deltasqy / momentum_count;
+        momentumsqx_std = momentumsqx_std + deltasqx * (linearmomsqx - momentumsqx_avg);
+        momentumsqy_std = momentumsqy_std + deltasqy * (linearmomsqy - momentumsqy_avg);
+
+
         #ifdef ANGULARMOM_TIMESERIES
         fwrite(&vtemp, sizeof(double), 1, file1);
         #endif
@@ -505,10 +519,13 @@ void simulate(double alpha, double eta, int seed){
     momentumx_std = momentumx_std / (momentum_count - 1);
     momentumy_std = momentumy_std / (momentum_count - 1);
  
-    printf("%f %f %f %f %f %f %f %f\n", angularmom_avg, sqrt(angularmom_std), 
+    printf("%f %f %f %f %f %f %f %f %f %f %f %f\n", 
+                                        angularmom_avg, sqrt(angularmom_std), 
                                         angularmom_sq_avg, sqrt(angularmom_sq_std), 
                                         momentumx_avg, sqrt(momentumx_std), 
-                                        momentumy_avg, sqrt(momentumy_std));
+                                        momentumy_avg, sqrt(momentumy_std)
+                                        momentumsqx_avg, sqrt(momentumsqx_std),
+                                        momentumsqy_avg, sqrt(momentumsqy_std));
 
     free(cells);
     free(count);
