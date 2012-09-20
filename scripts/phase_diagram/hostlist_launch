@@ -1,7 +1,0 @@
-#!/bin/bash
-PWD=`pwd`
-
-for i in `cat hostlist` 
-do 
-    ssh -f $i "cd $PWD; screen -dm -S entbody python ./scripts/phase_diagram/hostlist_phases.py"
-done

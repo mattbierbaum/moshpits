@@ -6,6 +6,7 @@ from subprocess import Popen, PIPE, STDOUT
 import time
 
 samples = 50 
+clump   = 10
 curr = 0
 vorticies = []
 file = open("runs.txt", "w", 0)
@@ -16,26 +17,27 @@ for alpha in arange(0.0, 4.0, 4.0/60):
         avg,avgs,sq,sqs = [], [], [], []
         mxa,mxs,mya,mys = [], [], [], []
         mxsa, mxss, mysa, myss = [], [], [], []
-        curr += samples
-        procs = [Popen("nice -n 20 ./entbody "+str(alpha)+" "+str(eta)+" "+str(seed), shell=True, stdin=PIPE, stdout=PIPE, close_fds=True) for seed in range(curr, curr+samples)]
-        while procs:
-            for p in procs:
-                retcode = p.poll()
-                if retcode is not None:
-                    tavg, tavgs, tsq, tsqs, tmxa,tmxs,tmya,tmys, tmxsa, tmxss, tmysa, tmyss = [float(s) for s in  p.stdout.read().split(' ')]
-                    avg.append(tavg)
-                    avgs.append(tavgs)
-                    sq.append(tsq)
-                    sqs.append(tsqs)
-                    mxa.append(tmxa)
-                    mxs.append(tmxs)
-                    mya.append(tmya)
-                    mys.append(tmys)
-                    mxsa.append(tmxsa)
-                    mxss.append(tmxss)
-                    mysa.append(tmysa)
-                    myss.append(tmyss)
-                    procs.remove(p)
+        for a in range(0, samples, curr):
+            curr += clump 
+            procs = [Popen("nice -n 20 ./entbody "+str(alpha)+" "+str(eta)+" "+str(seed), shell=True, stdin=PIPE, stdout=PIPE, close_fds=True) for seed in range(curr, curr+clump)]
+            while procs:
+                for p in procs:
+                    retcode = p.poll()
+                    if retcode is not None:
+                        tavg, tavgs, tsq, tsqs, tmxa,tmxs,tmya,tmys, tmxsa, tmxss, tmysa, tmyss = [float(s) for s in  p.stdout.read().split(' ')]
+                        avg.append(tavg)
+                        avgs.append(tavgs)
+                        sq.append(tsq)
+                        sqs.append(tsqs)
+                        mxa.append(tmxa)
+                        mxs.append(tmxs)
+                        mya.append(tmya)
+                        mys.append(tmys)
+                        mxsa.append(tmxsa)
+                        mxss.append(tmxss)
+                        mysa.append(tmysa)
+                        myss.append(tmyss)
+                        procs.remove(p)
         avg  = array(avg)
         avgs = array(avgs)
         sq   = array(sq)

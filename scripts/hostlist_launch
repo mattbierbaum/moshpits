@@ -1,0 +1,5 @@
+#!/bin/bash
+for i in `cat hostlist` 
+do 
+    ssh -f $i "cd ~/Desktop/moshpits; screen -dm -S entbody python ./scripts/hostlist_phases.py"
+done
