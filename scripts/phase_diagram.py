@@ -17,7 +17,7 @@ for alpha in arange(0.0, 4.0, 4.0/60):
         avg,avgs,sq,sqs = [], [], [], []
         mxa,mxs,mya,mys = [], [], [], []
         mxsa, mxss, mysa, myss = [], [], [], []
-        for a in range(0, samples, curr):
+        for a in range(0, samples, clump):
             curr += clump 
             procs = [Popen("nice -n 20 ./entbody "+str(alpha)+" "+str(eta)+" "+str(seed), shell=True, stdin=PIPE, stdout=PIPE, close_fds=True) for seed in range(curr, curr+clump)]
             while procs:
