@@ -22,9 +22,15 @@ To install these on a debian system, use the command:
 
     sudo apt-get install freeglut3-dev libdevil-dev    
 
-There are several helper scripts which generate several of the plots in the paper. 
+There are helper scripts which generate several of the plots in the paper. 
 They are written in Python and located in the scripts directory.  Each one
-requires different files to be present in order to run.  The generation of these
-are controlled by the top `#define` statements in `main.c`.
+requires different files to be present in order to run.  
+To make the plots you can go to the scripts directory and run:
+
+    python utilities.py all
+
+or you can run each individually after reading the `utilities.py` file.
+If you prefer to launch the phase diagram creation across many machines, edit the hostlist
+file and then launch `hostlist_launch`.  
 
 Check out the related project at <a href="http://github.com/mattbierbaum/moshpits.js">Moshpits.js</a>
