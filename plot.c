@@ -18,8 +18,8 @@ void key_up(unsigned char key, int x, int y){
 }
 
 void plot_init(){
-  plot_sizex = 720;
-  plot_sizey = 720;
+  plot_sizex = 680;
+  plot_sizey = 680;
   win = 0;
   plot_init_opengl();
   int i;
