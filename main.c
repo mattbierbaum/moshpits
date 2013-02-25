@@ -1,3 +1,7 @@
+//===================================================
+// Author: Matthew Bierbaum
+// Project: Collective motion at heavy metal concerts
+//===================================================
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -14,9 +18,11 @@
 //===========================================
 // do we want to record various measurements?
 //#define ANGULARMOM_TIMESERIES
-//#define VELOCITY_DISTRIBUTION
+#define VELOCITY_DISTRIBUTION
 //#define TEMPERATURE_BINS
-#define SHOWCENTEROFMASS 0
+#define SHOWCENTEROFMASS    0
+#define SHOWVELOCITYARROWS  1
+#define SHOWFORCECOLORS     0
 //===========================================
 
 //-----------------------------------------------------------
@@ -29,7 +35,7 @@
 #define RADS    10
 #define BINS    50
 
-void simulate(double a, double e, int s);
+void simulate(double alpha, double sigma, int seed, double damp);
 
 void   init_circle(double *x, double *v, int *t, double s, long N, double L);
 void   temperature(double *x, double *v, int *t, int N, double L, int *pbc, int bins[RADS][BINS]);
@@ -51,16 +57,18 @@ unsigned long long int vran;
 //===================================================
 int main(int argc, char **argv){
     double alpha_in = 0.1; 
-    double eta_in   = 0.1;
+    double sigma_in = 0.1;
+    double damp_in  = 1.0;
     int seed_in     = 0;
 
     if (argc == 1) 
-        simulate(alpha_in, eta_in, seed_in);
-    else if (argc == 4){
+        simulate(alpha_in, sigma_in, seed_in, damp_in);
+    else if (argc == 5){
         alpha_in = atof(argv[1]);
-        eta_in   = atof(argv[2]);
+        sigma_in = atof(argv[2]);
         seed_in  = atoi(argv[3]);
-        simulate(alpha_in, eta_in, seed_in);
+        damp_in  = atof(argv[4]);
+        simulate(alpha_in, sigma_in, seed_in, damp_in);
     }
     else {
         printf("usage:\n");
@@ -74,7 +82,7 @@ int main(int argc, char **argv){
 //==================================================
 // simulation
 //==================================================
-void simulate(double alpha, double eta, int seed){
+void simulate(double alphain, double sigmain, int seed, double dampin){
     ran_seed(seed);
     int  RIC  = 0;
 
@@ -86,13 +94,12 @@ void simulate(double alpha, double eta, int seed){
     int pbc[] = {1,1};
 
     double epsilon = 100.0;
-    double T       = eta;
-    double speed   = alpha;
+    double sigma   = sigmain;
+    double alpha   = alphain;
 
     double vhappy_black = 0.0;
     double vhappy_red   = 1.0;
-    double damp_coeff   = 1.0;
-    double Tglobal      = 0.0;
+    double damp_coeff   = dampin;
 
     double dt  = 1e-1;
     double t   = 0.0;
@@ -126,8 +133,11 @@ void simulate(double alpha, double eta, int seed){
         int *key;
         double kickforce = 2.0;
         plot_init(); 
+        #ifdef OPENIL
+            plot_initialize_canvas();
+        #endif
         plot_clear_screen();
-        key = plot_render_particles(x, rad, type, N, L,col,0,0,0, pbc);
+        key = plot_render_particles(x, rad, type, N, L,col,0,0,0,0, pbc,v, SHOWVELOCITYARROWS);
         int showplot = 1;
     #endif
 
@@ -287,7 +297,7 @@ void simulate(double alpha, double eta, int seed){
                             co = epsilon * (1-l/r0)*(1-l/r0) * (l<r0);
                             for (k=0; k<2; k++){
                                 f[2*i+k] += - dx[k] * co;
-                                col[i] += 0.0;//co*co*dx[k]*dx[k]; 
+                                col[i] += co*co*dx[k]*dx[k]; 
                             }
                         }
                         //===============================================
@@ -305,8 +315,8 @@ void simulate(double alpha, double eta, int seed){
             // flocking force 
             wlen = w[2*i+0]*w[2*i+0] + w[2*i+1]*w[2*i+1];
             if (type[i] == RED && neigh[i] > 0 && wlen > 1e-6){
-                f[2*i+0] += speed * w[2*i+0] / wlen; 
-                f[2*i+1] += speed * w[2*i+1] / wlen;
+                f[2*i+0] += alpha * w[2*i+0] / wlen; 
+                f[2*i+1] += alpha * w[2*i+1] / wlen;
             }
 
             //====================================
@@ -321,13 +331,13 @@ void simulate(double alpha, double eta, int seed){
             //=======================================
             // noise term
             if (type[i] == RED){
-                double rt = 2*pi*ran_ran2();
-                f[2*i+0] += T * cos(rt);
-                f[2*i+1] += T * sin(rt);
+                // Box-Muller method
+                double u1 = ran_ran2();
+                double u2 = 2*pi*ran_ran2();
+                double lfac = sqrt(-2*log(u1));
+                f[2*i+0] += sigma*lfac*cos(u2);
+                f[2*i+1] += sigma*lfac*sin(u2);
             }
-
-            f[2*i+0] += Tglobal*(ran_ran2()-0.5);
-            f[2*i+1] += Tglobal*(ran_ran2()-0.5);
 
             //=====================================
             // kick force
@@ -380,18 +390,26 @@ void simulate(double alpha, double eta, int seed){
                 x[2*i+1] >= L || x[2*i+1] < 0.0)
                 printf("out of bounds\n");
             
-            col[i] = col[i]/4; 
+            col[i] = col[i]/12; 
         }
         #ifdef OPENMP
         #pragma omp barrier
         #endif
 
         #ifdef PLOT 
-        if (frames % 10 == 0){
+        int skip = 5;
+        int start = 20;
+        if (frames % skip == 0 && frames >= start){
             double cmx, cmy;
             centerofmass(x, type, N, L, &cmx, &cmy);
             plot_clear_screen();
-            key = plot_render_particles(x, rad, type, N, L,col, cmx, cmy, SHOWCENTEROFMASS, pbc);
+            key = plot_render_particles(x, rad, type, N, L,col, SHOWFORCECOLORS, cmx, cmy, SHOWCENTEROFMASS, pbc, v, SHOWVELOCITYARROWS);
+           
+            #ifdef OPENIL
+                char fname[100];
+                sprintf(fname, "out%04d.png", frames/skip-start/skip);
+                plot_saveimage(fname);
+            #endif
         }
         #endif
         frames++;
@@ -448,6 +466,10 @@ void simulate(double alpha, double eta, int seed){
         #endif
 
         #ifdef PLOT
+        #ifdef OPENIL
+        if (key['p'] == 1)
+            plot_saveimage("out.png");
+        #endif
         if (key['f'] == 1)
             showplot = !showplot;
         if (key['k'] == 1)
@@ -478,12 +500,6 @@ void simulate(double alpha, double eta, int seed){
                     o[2*i+0] = kickforce;
             }
         }
-        if (key['9'] == 1)
-            Tglobal -= 0.01;
-        if (key['0'] == 1)
-            Tglobal += 0.01;
-        if (key['8'] == 1)
-            Tglobal = 0.0;
         #endif
     }
     // end of the magic, cleanup
@@ -577,7 +593,7 @@ void init_circle(double *x, double *v,
         
         // the radius for which 30% of the particles are red on avg
         double dd = sqrt((tx-L/2)*(tx-L/2) + (ty-L/2)*(ty-L/2));
-        double rad = sqrt(0.15*L*L / pi);
+        double rad = sqrt(0.16*L*L / pi);
 
         //if (i<0.15*N)
         if (dd < rad)
@@ -711,4 +727,5 @@ void temperature(double *x, double *v, int *t, int N, double L, int *pbc, int bi
         }
     }
 }
+
 

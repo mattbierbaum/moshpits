@@ -4,6 +4,7 @@ DOPLOT = 1
 FPS    = 1
 POINTS = 0
 OPENMP = 0
+IMAGE  = 0
 
 # standard compile options for the c++ executable
 GCC = gcc
@@ -15,7 +16,12 @@ LIBFLAGS = -lm
 ifeq ($(DOPLOT), 1)
     OBJS += plot.c
     FLAGS += -DPLOT
-    LIBFLAGS += -lGL -lGLU -lglut
+    LIBFLAGS += -lGL -lGLU -lglut 
+endif
+
+ifeq ($(IMAGE), 1)
+	FLAGS += -DOPENIL
+	LIBFLAGS += -lIL -lILU -lILUT
 endif
 
 ifeq ($(OPENMP), 1)

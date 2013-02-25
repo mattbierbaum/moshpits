@@ -18,8 +18,8 @@ void key_up(unsigned char key, int x, int y){
 }
 
 void plot_init(){
-  plot_sizex = 680;
-  plot_sizey = 680;
+  plot_sizex = 720;
+  plot_sizey = 720;
   win = 0;
   plot_init_opengl();
   int i;
@@ -65,9 +65,75 @@ int plot_clear_screen(){
   return 1;
 }
 
+#ifdef OPENIL
+ILuint img;
+void plot_initialize_canvas(){
+  ilInit();
+  ilGenImages(1, &img);
+  ilBindImage(img);
+  ilTexImage(plot_sizex, plot_sizey, 0, 3, IL_RGB, IL_UNSIGNED_BYTE, NULL);
+}
 
-int *plot_render_particles(double *x, double *rad, int *type, long N, double L, double *shade, 
-                           double cmx, double cmy, int docom, int *pbc){
+void plot_saveimage(const char* name){
+  ILubyte *data = ilGetData();
+
+  int viewport[4];
+  glGetIntegerv(GL_VIEWPORT, viewport);
+  int x      = viewport[0];
+  int y      = viewport[1];
+  int width  = viewport[2];
+  int height = viewport[3];
+
+  glReadPixels(x, y, width, height, GL_RGB, GL_UNSIGNED_BYTE, data);
+  
+  ilEnable(IL_FILE_OVERWRITE);
+  ilSaveImage(name);
+}
+#endif
+
+void draw_arrow(double px, double py, double vx, double vy, int inverse){
+    GLfloat savedLineWidth = 1.0f;
+    glGetFloatv(GL_LINE_WIDTH, &savedLineWidth);
+    //glLineWidth(1.8*f*f*s);//sqrt(vx*vx+vy*vy)/20.);
+
+    float t;
+    float f = 1.6; //2.2
+    float h = 0.7; //1.1
+    float s = sqrt(vx*vx+vy*vy);
+    double pt1x, pt1y, pt2x, pt2y, theta;
+    pt1x = px-f*vx/2;
+    pt1y = py-f*vy/2;
+    pt2x = px+f*vx/2;
+    pt2y = py+f*vy/2;
+    theta = atan2(pt2y-pt1y, pt2x-pt1x);
+
+    double perpx, perpy;
+    perpx = -s/10.* f*vy/2;
+    perpy = s/10.* f*vx/2;
+
+    plot_set_draw_color(1.0,0.0,0.0,0.0);
+    if (inverse)
+        plot_set_draw_color(0.0,0.0,0.0,0.0);
+    glBegin(GL_POLYGON);
+    for (t=theta; t<theta+2*pi; t+=2*pi/3)
+      glVertex2f(pt2x + h*cos(t)*s/f, pt2y + h*sin(t)*s/f);
+    glEnd();
+
+    plot_set_draw_color(1.0,0.0,0.0,0.0);
+    if (inverse)
+        plot_set_draw_color(0.0,0.0,0.0,0.0);
+    glBegin(GL_POLYGON);
+    glVertex2f(pt1x+perpx, pt1y+perpy);
+    glVertex2f(pt1x-perpx, pt1y-perpy);
+    glVertex2f(pt2x-perpx, pt2y-perpy);
+    glVertex2f(pt2x+perpx, pt2y+perpy);
+    glEnd();
+
+    glLineWidth(savedLineWidth);
+}
+
+int *plot_render_particles(double *x, double *rad, int *type, long N, double L, double *shade, int forces,
+                           double cmx, double cmy, int docom, int *pbc, double *v, int doarrows){
     // focus on the part of scene where we draw nice
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -104,19 +170,27 @@ int *plot_render_particles(double *x, double *rad, int *type, long N, double L, 
         tx = (float)x[2*i+0];
         ty = (float)x[2*i+1];
 
-        c = fabs(shade[i]);
-        if (c < 0) c = 0.0;
-        if (c > 1.0) c = 1.0;
-
-        cr = c;
-        cg = c;
-        cb = c;
-        ca = 1.0;
-
-        if (type[i] == 1) {
-            cr = 0.9;//if (cr < 0.2) cr = 0.2;
-            cg = 0.05;
-            cb = 0.05;
+        if (forces){
+            c = fabs(shade[i]);
+            if (c < 0) c = 0.0; 
+            if (c > 1.0) c = 1.0;
+            cr = cg = cb = c;
+            ca = 1.0;
+            if (type[i] == 1) {
+                cr = 0.9;
+                cg = 0.05;
+                cb = 0.05;
+            }
+        } else {
+            cr = 1.0; 
+            cg = 1.0;
+            cb = 1.0;
+            ca = 1.0;
+            if (type[i] == 1) {
+                cr = 0.00; 
+                cg = 0.00;
+                cb = 0.00;
+            }
         }
         
         #ifdef POINTS
@@ -137,6 +211,10 @@ int *plot_render_particles(double *x, double *rad, int *type, long N, double L, 
         glEnd();
         #endif
     }
+
+    if (doarrows)
+        for (i=0; i<N; i++)
+            if (type[i] == 1) draw_arrow(x[2*i+0], x[2*i+1], v[2*i+0], v[2*i+1], forces);
     #ifdef OPENMP 
     //#pragma omp barrier
     #endif
