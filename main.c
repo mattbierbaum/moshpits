@@ -18,10 +18,10 @@
 //===========================================
 // do we want to record various measurements?
 //#define ANGULARMOM_TIMESERIES
-#define VELOCITY_DISTRIBUTION
+//#define VELOCITY_DISTRIBUTION
 //#define TEMPERATURE_BINS
 #define SHOWCENTEROFMASS    0
-#define SHOWVELOCITYARROWS  1
+#define SHOWVELOCITYARROWS  0
 #define SHOWFORCECOLORS     0
 //===========================================
 
@@ -56,7 +56,7 @@ unsigned long long int vran;
 // the main function
 //===================================================
 int main(int argc, char **argv){
-    double alpha_in = 0.1; 
+    double alpha_in = 0.9; 
     double sigma_in = 0.1;
     double damp_in  = 1.0;
     int seed_in     = 0;

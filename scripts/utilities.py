@@ -2,7 +2,7 @@ import numpy as np
 import scipy as sp
 import pylab as pl
 import scipy.optimize as opt
-import re, shutil
+import re, shutil, os
 
 from subprocess import Popen, PIPE, STDOUT
 import time
@@ -24,11 +24,15 @@ def setOptions(fps=0, opengl=0, velocities=0, temperature=0, timeseries=0):
     cvel = "" if velocities else "//"
     ctmp = "" if temperature else "//"
     cang = "" if timeseries else "//"
+    dop  = "1" if opengl else "0"
+    dof  = "1" if fps else "0"
     changeLine(r"#define VELOCITY_DISTRIBUTION", cvel+"#define VELOCITY_DISTRIBUTION", "../main.c")
     changeLine(r"#define TEMPERATURE_BINS",      ctmp+"#define TEMPERATURE_BINS",      "../main.c")
     changeLine(r"#define ANGULARMOM_TIMESERIES", cang+"#define ANGULARMOM_TIMESERIES", "../main.c")
     changeLine(r"^DOPLOT", "DOPLOT = "+dop, "../Makefile")
-    changeLine(r"^FPS",    "FPS = "+dof,    "../Makefile")
+    changeLine(r"^FPS",    "FPS    = "+dof, "../Makefile")
+    print "Now building entbody"
+    os.system("cd .. && make && cd -")
 
 def launchSingleMoshpit(alpha, eta, seed, damp=1.0):
     return Popen("nice -n 20 ../entbody "+str(alpha)+" "+str(eta)+" "+str(seed)+" "+str(damp), 
@@ -45,13 +49,14 @@ def runSingleMoshpit(alpha, eta, seed, damp=1.0):
     return [float(o) for o in out.split(' ')]
 
 def runEntireSlice(samples=50, clump=10, alpha_range=(0.0,4.0,4.0/60), filename="runs.txt"):
+    setOptions()
     curr = 0
     file = open(filename, "w", 0)
     
-    for alpha in arange(*alpha_range):
-        for eta in arange(0.0, 3.0, 0.06):
+    for alpha in np.arange(*alpha_range):
+        for eta in np.arange(0.0, 3.0, 0.06):
             start = time.time()
-            data = [list()]*12
+            data = [[] for i in xrange(12)]
             for a in range(0, samples, clump):
                 curr += clump 
                 procs = [launchSingleMoshpit(alpha,eta,seed) for seed in range(curr, curr+clump)]
@@ -60,12 +65,12 @@ def runEntireSlice(samples=50, clump=10, alpha_range=(0.0,4.0,4.0/60), filename=
                         retcode = p.poll()
                         if retcode is not None:
                             out = p.stdout.read().split(' ')
-                            for i in xrange(out):
+                            for i in xrange(len(out)):
                                 data[i].append(float(out[i]))
                             procs.remove(p)
             strout = str(alpha)+" "+str(eta)+" "
-            strout += " ".join([str(mean(d)) for d in data])+" "
-            strout += " ".join([str(std(d)) for d in data])
+            strout += " ".join([str(np.mean(d)) for d in data])+" "
+            strout += " ".join([str(np.std(d)) for d in data])
             strout += "\n"
             file.write(strout)
             end = time.time()
@@ -89,10 +94,11 @@ def showFitToMB(T, vreal, preal):
     pl.xlabel(r'$|r|$', fontsize=20)
     pl.ylabel(r'$P(r)$', fontsize=20)
     pl.title("Velocity Distribution in Moshpit", fontsize=20)
-    pl.show()
+    pl.savefig("velocitydist.png")
 
 def runVelocityFit():
-    runSingleMoshpit(0.05,0.9,1,0.05)
+    setOptions(velocities=1)
+    runSingleMoshpit(0.0,3.0,1,0.05)
     r = np.fromfile(open("velocities.txt", "rb"))
     r = r[r<6]
     
@@ -102,7 +108,7 @@ def runVelocityFit():
     vreal = h[1][:-1]
     preal = 1.*h[0] / h[0].sum() / (vreal[1] - vreal[0]) 
     
-    f = opt.fmin(fitToMB, [6], args=(vreal,preal), xtol=1e-8)
+    f = opt.fmin(fitToMB, [6], args=(vreal,preal), xtol=1e-8, disp=0)
     showFitToMB(f, vreal, preal)
 
 
@@ -113,13 +119,15 @@ def runTemperatureFits():
     def dofit(damp, rad):
         r = np.loadtxt("temp_%0.2f" % damp + ".txt")
         p = r[rad,:]
-        vreal = arange(0, 3, 3.0/50)
+        vreal = np.arange(0, 3, 3.0/50)
         preal = 1.*p / p.sum() / (vreal[1] - vreal[0]) 
-        f = opt.fmin(fitToMB, [3], args=(vreal,preal), xtol=1e-8)
+        f = opt.fmin(fitToMB, [3], args=(vreal,preal), xtol=1e-8, disp=0)
+        return f[0]
 
+    setOptions(temperature=1)
     pl.figure()
-    for i in arange(0.05, 0.51, 0.05):
-        runSingleMoshpit(0.1,0.9,1,i)
+    for i in np.arange(0.05, 0.51, 0.05):
+        runSingleMoshpit(0.0,3.0,1,i)
         temps = []
         for j in range(10):
             temps.append(dofit(i,j))
@@ -130,6 +138,10 @@ def runTemperatureFits():
     pl.title("Temperature Distribution in Moshpit", fontsize=20)
     pl.savefig("temperature.png")
 
-#if __name__ == "__main__":
-#    runTemperaturefits()
-#    runVelocityFit()
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] == "all":
+        print "This is going to take a while..."
+        runVelocityFit()
+        runTemperatureFits()
+        runEntireSlice()
