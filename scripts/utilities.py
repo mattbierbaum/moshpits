@@ -32,7 +32,7 @@ def setOptions(fps=0, opengl=0, velocities=0, temperature=0, timeseries=0):
     changeLine(r"^DOPLOT", "DOPLOT = "+dop, "../Makefile")
     changeLine(r"^FPS",    "FPS    = "+dof, "../Makefile")
     print "Now building entbody"
-    os.system("cd .. && make && cd -")
+    os.system("cd .. && make clean && make && cd -")
 
 def launchSingleMoshpit(alpha, eta, seed, damp=1.0):
     return Popen("nice -n 20 ../entbody "+str(alpha)+" "+str(eta)+" "+str(seed)+" "+str(damp), 
@@ -98,7 +98,9 @@ def showFitToMB(T, vreal, preal):
 
 def runVelocityFit():
     setOptions(velocities=1)
-    runSingleMoshpit(0.0,3.0,1,0.05)
+    runSingleMoshpit(0.2,0.6,1,0.3)
+    setOptions(velocities=1, opengl=1)
+
     r = np.fromfile(open("velocities.txt", "rb"))
     r = r[r<6]
     
@@ -119,24 +121,52 @@ def runTemperatureFits():
     def dofit(damp, rad):
         r = np.loadtxt("temp_%0.2f" % damp + ".txt")
         p = r[rad,:]
-        vreal = np.arange(0, 3, 3.0/50)
+        vreal = np.arange(0, 125, 125.0/50)
         preal = 1.*p / p.sum() / (vreal[1] - vreal[0]) 
-        f = opt.fmin(fitToMB, [3], args=(vreal,preal), xtol=1e-8, disp=0)
+        f = opt.fmin(fitToMB, [30], args=(vreal,preal), xtol=1e-8, disp=0)
         return f[0]
 
     setOptions(temperature=1)
     pl.figure()
-    for i in np.arange(0.05, 0.51, 0.05):
-        runSingleMoshpit(0.0,3.0,1,i)
+    for i in np.arange(0.1, 0.5, 0.1):
+        runSingleMoshpit(0.0,0.0,1,i)
         temps = []
-        for j in range(10):
+        for j in range(6):
             temps.append(dofit(i,j))
         pl.plot(range(len(temps)), temps, 'o-', label=r"$\beta=%0.2f$" % i)
-    
+    setOptions(opengl=1)
+
     pl.xlabel(r'$|r|$', fontsize=20)
     pl.ylabel(r'$T(r)$', fontsize=20)
     pl.title("Temperature Distribution in Moshpit", fontsize=20)
     pl.savefig("temperature.png")
+
+def runTemperatureSlice(beta=0.25):
+    def dofit(damp, rad):
+        r = np.loadtxt("temp_%0.2f" % damp + ".txt")
+        p = r[rad,:]
+        vreal = np.arange(0, 125, 125.0/50)
+        preal = 1.*p / p.sum() / (vreal[1] - vreal[0]) 
+        f = opt.fmin(fitToMB, [30], args=(vreal,preal), xtol=1e-8, disp=0)
+        pl.plot(preal, 'o', label=str(rad))
+        pl.plot(MB(vreal, f[0]), '-')
+        return f[0]
+
+    setOptions(temperature=1)
+    pl.figure()
+    runSingleMoshpit(0.1,1.9,1,beta)
+    temps = []
+    for j in range(10):
+        ttemp = dofit(beta,j)
+        #pl.plot(range(len(temps)), temps, 'o-', label=r"$\beta=%0.2f$" % i)
+    pl.legend()
+    setOptions(opengl=1)
+
+    pl.xlabel(r'$|r|$', fontsize=20)
+    pl.ylabel(r'$T(r)$', fontsize=20)
+    pl.title("Temperature Distribution in Moshpit", fontsize=20)
+    pl.savefig("temperature.png")
+
 
 if __name__ == "__main__":
     import sys

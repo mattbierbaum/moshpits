@@ -21,7 +21,7 @@
 //#define VELOCITY_DISTRIBUTION
 //#define TEMPERATURE_BINS
 #define SHOWCENTEROFMASS    0
-#define SHOWVELOCITYARROWS  0
+#define SHOWVELOCITYARROWS  1
 #define SHOWFORCECOLORS     0
 //===========================================
 
@@ -87,13 +87,13 @@ void simulate(double alphain, double sigmain, int seed, double dampin){
     int  RIC  = 0;
 
     int    NMAX    = 50;
-    int    N       = 500;
+    int    N       = 1000;
     double radius  = 1.0;
     double L       = 1.03*sqrt(pi*radius*radius*N);
 
     int pbc[] = {1,1};
 
-    double epsilon = 100.0;
+    double epsilon = 25.0;
     double sigma   = sigmain;
     double alpha   = alphain;
 
@@ -151,7 +151,7 @@ void simulate(double alphain, double sigmain, int seed, double dampin){
             x[2*i+0] = L*ran_ran2();
             x[2*i+1] = L*ran_ran2();
      
-            if (ran_ran2() > 0.3){
+            if (ran_ran2() > 0.16){
                 v[2*i+0] = 0.0;
                 v[2*i+1] = 0.0;
                 type[i] = BLACK;
@@ -250,7 +250,7 @@ void simulate(double alphain, double sigmain, int seed, double dampin){
         int image[2];
         double dx[2];
         int goodcell, ind, n;
-        double r0, l, co, dist;
+        double r0, l, co, co1, dist;
         double wlen, vlen, vhappy;
 
         #ifdef OPENMP
@@ -294,10 +294,11 @@ void simulate(double alphain, double sigmain, int seed, double dampin){
                         if (dist > 1e-10 && dist < R2){
                             r0 = R; 
                             l  = sqrt(dist);
-                            co = epsilon * (1-l/r0)*(1-l/r0) * (l<r0);
+                            co1 = (1-l/r0);
+                            co = epsilon * co1*sqrt(co1) * (l<r0);
                             for (k=0; k<2; k++){
-                                f[2*i+k] += - dx[k] * co;
-                                col[i] += co*co*dx[k]*dx[k]; 
+                                f[2*i+k] += - dx[k]/l * co;
+                                col[i] += co*co*dx[k]*dx[k]/dist; 
                             }
                         }
                         //===============================================
@@ -313,7 +314,7 @@ void simulate(double alphain, double sigmain, int seed, double dampin){
 
             //=====================================
             // flocking force 
-            wlen = w[2*i+0]*w[2*i+0] + w[2*i+1]*w[2*i+1];
+            wlen = sqrt(w[2*i+0]*w[2*i+0] + w[2*i+1]*w[2*i+1]);
             if (type[i] == RED && neigh[i] > 0 && wlen > 1e-6){
                 f[2*i+0] += alpha * w[2*i+0] / wlen; 
                 f[2*i+1] += alpha * w[2*i+1] / wlen;
@@ -321,7 +322,7 @@ void simulate(double alphain, double sigmain, int seed, double dampin){
 
             //====================================
             // self-propulsion
-            vlen = v[2*i+0]*v[2*i+0] + v[2*i+1]*v[2*i+1];
+            vlen = sqrt(v[2*i+0]*v[2*i+0] + v[2*i+1]*v[2*i+1]);
             vhappy = type[i]==RED?vhappy_red:vhappy_black;
             if (vlen > 1e-6){
                 f[2*i+0] += damp_coeff*(vhappy - vlen)*v[2*i+0]/vlen;
@@ -397,7 +398,7 @@ void simulate(double alphain, double sigmain, int seed, double dampin){
         #endif
 
         #ifdef PLOT 
-        int skip = 5;
+        int skip = 10; if (RIC == 1) skip *=3;
         int start = 20;
         if (frames % skip == 0 && frames >= start){
             double cmx, cmy;
@@ -407,7 +408,7 @@ void simulate(double alphain, double sigmain, int seed, double dampin){
            
             #ifdef OPENIL
                 char fname[100];
-                sprintf(fname, "out%04d.png", frames/skip-start/skip);
+                sprintf(fname, "/media/scratch/moshpits/out%06d.png", frames/skip-start/skip);
                 plot_saveimage(fname);
             #endif
         }
